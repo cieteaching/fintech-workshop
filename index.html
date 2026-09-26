@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>HKBU CIE FinTech Workshop - Mint Certificate</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/ethers/6.7.0/ethers.umd.min.js"></script>
+  <style>
+    body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #0e1329; color: #fff; text-align: center; padding: 40px; }
+    .card { background: #141c3a; border: 2px solid #d4af37; border-radius: 16px; max-width: 500px; margin: 0 auto; padding: 30px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
+    h1 { color: #d4af37; font-size: 24px; margin-bottom: 5px; }
+    h3 { color: #a0aec0; font-size: 16px; font-weight: 400; margin-bottom: 25px; }
+    input { width: 80%; padding: 12px; margin: 15px 0; border-radius: 8px; border: 1px solid #4a5568; background: #0a0e1f; color: #fff; text-align: center; font-size: 16px; }
+    button { background: linear-gradient(135deg, #d4af37, #aa771c); border: none; padding: 14px 28px; color: #0e1329; font-weight: bold; font-size: 16px; border-radius: 8px; cursor: pointer; transition: 0.2s; }
+    button:hover { opacity: 0.9; transform: scale(1.02); }
+    #status { margin-top: 20px; font-size: 14px; color: #38bdf8; word-break: break-all; }
+  </style>
+</head>
+<body>
+
+  <div class="card">
+    <h1>HKBU CIE FinTech Concentration</h1>
+    <h3>Web3.0 & Smart Contracts Workshop</h3>
+    
+    <button id="connectBtn" onclick="connectWallet()">1. Connect MetaMask</button>
+    <p id="walletAddress" style="font-size: 12px; color: #718096;"></p>
+
+    <div id="mintForm" style="display:none;">
+      <hr style="border-color: #2d3748; margin: 20px 0;">
+      <label for="studentName">Enter Your Full Name (for Metadata):</label><br>
+      <input type="text" id="studentName" placeholder="e.g. Chan Tai Man" />
+      <br>
+      <button onclick="mintNFT()">2. Mint My Certificate NFT</button>
+    </div>
+
+    <div id="status"></div>
+  </div>
+
+  <script>
+    // Instructor Config
+    const CONTRACT_ADDRESS = "0x27eF5c110656b6Df1F0f44F3f9bB7a6b847C88f6";
+    const IPFS_IMAGE_URI = "ipfs://bafkreieez4ex2ebd3tmuq3jsirq6xuwugd2jp6auuignzlmsdpqyqdtxyu"; 
+
+    const CONTRACT_ABI = [
+      "function mintCertificate(string memory tokenURI) public returns (uint256)"
+    ];
+
+    let signer;
+    let contract;
+
+    async function connectWallet() {
+      if (typeof window.ethereum !== 'undefined') {
+        try {
+          const provider = new ethers.BrowserProvider(window.ethereum);
+          signer = await provider.getSigner();
+          contract = new ethers.Contract(CONTRACT_ADDRESS, CONTRACT_ABI, signer);
+          
+          const address = await signer.getAddress();
+          document.getElementById('walletAddress').innerText = "Connected: " + address;
+          document.getElementById('connectBtn').style.display = "none";
+          document.getElementById('mintForm').style.display = "block";
+        } catch (err) {
+          document.getElementById('status').innerText = "Connection failed: " + err.message;
+        }
+      } else {
+        alert("Please install MetaMask extension in Chrome!");
+      }
+    }
+
+    async function mintNFT() {
+      const name = document.getElementById('studentName').value.trim();
+      if (!name) {
+        alert("Please type your name first!");
+        return;
+      }
+
+      document.getElementById('status').innerText = "Preparing certificate metadata...";
+
+      // Construct dynamic JSON metadata on the fly using Data URI format
+      const metadata = {
+        name: `HKBU CIE Certificate - ${name}`,
+        description: `This certificate verifies that ${name} successfully completed the Web3.0 & Smart Contracts Workshop hosted by HKBU CIE FinTech Concentration.`,
+        image: IPFS_IMAGE_URI,
+        attributes: [
+          { trait_type: "Student Name", value: name },
+          { trait_type: "Institution", value: "HKBU CIE" },
+          { trait_type: "Course", value: "Financial Technology" },
+          { trait_type: "Topic", value: "Web3.0 & Smart Contracts" }
+        ]
+      };
+
+      // Convert JSON metadata directly into a Base64 Data URI (No server/Pinata API needed during class!)
+      const jsonString = JSON.stringify(metadata);
+      const tokenURI = "data:application/json;base64," + btoa(unescape(encodeURIComponent(jsonString)));
+
+      try {
+        document.getElementById('status').innerText = "Please confirm transaction in MetaMask...";
+        const tx = await contract.mintCertificate(tokenURI);
+        document.getElementById('status').innerText = "Minting in progress... Tx Hash: " + tx.hash;
+        
+        await tx.wait();
+        document.getElementById('status').innerHTML = `🎉 <strong>Success!</strong> Certificate minted.<br><a href="https://sepolia.etherscan.io/tx/${tx.hash}" target="_blank" style="color:#d4af37;">View on Etherscan Explorer</a>`;
+      } catch (err) {
+        console.error(err);
+        document.getElementById('status').innerText = "Transaction canceled or failed: " + err.message;
+      }
+    }
+  </script>
+</body>
+</html>
